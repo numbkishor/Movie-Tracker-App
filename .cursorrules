@@ -1,0 +1,79 @@
+# Reelist — Cursor rules
+
+You are working on Reelist, a social movie watched-list tracker (Letterboxd-style).
+Read architecture.md and design.md before generating any non-trivial code — they
+are the source of truth for structure and visual system. This file is the
+day-to-day ruleset for how to write code in this repo.
+
+## Stack (do not deviate without asking)
+
+- Next.js (App Router), React, TypeScript
+- Supabase: Postgres, Auth, Row-Level Security, Storage (not used yet — no
+  user-uploaded images in scope)
+- TMDB API for all movie/TV metadata and imagery
+- Deployed on Vercel, installable as a PWA
+- No native mobile framework (no Flutter, no React Native) — the PWA is the
+  mobile app for now. Do not suggest introducing one.
+
+## Non-negotiables
+
+- Never expose the TMDB API key or Supabase service-role key in client code.
+  All TMDB calls go through a Next.js API route (`/app/api/tmdb/...`).
+- Every table that holds user data needs an RLS policy before it ships —
+  no table goes live with RLS disabled "temporarily."
+- No feature outside the current phase in phases.md gets built early, even if
+  it looks like a quick add. Flag it and move on.
+- IMDb rating is a static "Coming soon" label. Do not wire up OMDb or any
+  other API for it — this was an explicit decision, not an oversight.
+- No cast-to-IMDb redirect links. Cast list is TMDB name + photo + role only.
+- No user-uploaded movie logos. If TMDB has no logo for a title, render the
+  empty/placeholder state — do not add an upload flow.
+- Movies-only in the data model until phases.md says otherwise. Don't
+  preemptively build season/episode tracking.
+
+## Code style
+
+- TypeScript strict mode. No `any` unless there's a comment explaining why.
+- Functional React components, hooks over classes.
+- Co-locate a component's styles/types with the component unless they're
+  shared across routes.
+- Server Components by default; add `"use client"` only where interactivity
+  actually requires it (forms, buttons with handlers, anything using state).
+- Data fetching in Server Components or API routes, not client-side `useEffect`
+  fetches, unless it's genuinely a live/interactive case.
+- Prefer small, composable functions over one large handler. Name functions
+  for what they do, not how they're implemented.
+- Comments explain *why*, not *what* — don't narrate obvious code.
+
+## Naming
+
+- Files: kebab-case (`add-movie-form.tsx`)
+- Components: PascalCase
+- DB tables and columns: snake_case, matching architecture.md's schema
+  exactly — don't invent new column names ad hoc
+
+## Styling
+
+- Tailwind CSS, tokens driven by the palette and type scale in design.md.
+  Don't introduce raw hex values inline — extend the Tailwind theme instead.
+- Respect the light/dark mode toggle everywhere — never hardcode a color
+  that only works in one mode.
+- Glass panels use the `.glass` utility (backdrop-blur + translucent
+  surface) defined in design.md — don't hand-roll a one-off blur effect
+  per component.
+
+## When generating code, always
+
+1. Check whether the feature belongs in the current phase (phases.md) before
+   writing it.
+2. Check RLS implications before adding a new query — ask "can a logged-out
+   user, or another user, see this by accident?"
+3. Keep TMDB response shaping in one place (a `lib/tmdb.ts` mapper), not
+   duplicated per component.
+4. Flag anything that would cost money (Supabase overage, a paid API tier)
+   instead of silently adding it.
+
+## When unsure
+
+Ask, don't guess — especially on schema changes, RLS policies, or anything
+touching auth. A wrong guess here is expensive to unwind later.
