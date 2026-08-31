@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Reelist">
+  <rect width="512" height="512" rx="112" fill="#15130f"/>
+  <g fill="none" stroke="#e4a93f" stroke-width="26">
+    <circle cx="256" cy="256" r="164"/>
+  </g>
+  <g fill="#e4a93f">
+    <circle cx="256" cy="170" r="40"/>
+    <circle cx="182" cy="298" r="40"/>
+    <circle cx="330" cy="298" r="40"/>
+  </g>
+</svg>
