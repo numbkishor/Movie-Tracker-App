@@ -1,5 +1,14 @@
 # Reelist — build phases
 
+> **Decision, 2026-08-31 — phase gate lifted.** The original rule below was to
+> hold each phase until the previous one had real usage behind it. The project
+> owner directed that Phases 2–4 be built immediately, without waiting for the
+> Phase 1 usage evidence. Everything through Phase 3 is now implemented; the
+> exit conditions in each phase are therefore *unmet*, not *met* — they stay
+> written down as the questions still worth answering once people use the app.
+> Phase 4's Capacitor wrapper is scaffolded; its IMDb rating item is still
+> blocked on the explicit decision in prd.md (see that file).
+
 Each phase should be genuinely usable on its own before moving to the next.
 Don't start phase N+1 work early because "it's related" — that's how solo
 projects stall out half-finished. See architecture.md for schema details

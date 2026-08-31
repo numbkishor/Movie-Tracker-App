@@ -1,0 +1,11 @@
+{
+  "appId": "app.reelist.client",
+  "appName": "Reelist",
+  "webDir": "public",
+  "server": {
+    "url": "https://reelist.vercel.app",
+    "cleartext": false
+  },
+  "ios": { "contentInset": "always" },
+  "android": { "backgroundColor": "#15130f" }
+}

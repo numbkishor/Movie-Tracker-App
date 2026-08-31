@@ -9,13 +9,55 @@ import type { ProfileRow } from "@/lib/supabase/database.types";
  * design.md: the profile button opens the profile page — it is not a dropdown of
  * unrelated actions.
  */
+/** Icon-only nav destination. The label is the accessible name, not decoration. */
+function NavLink({
+  href,
+  label,
+  children,
+}: {
+  href: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-label={label}
+      title={label}
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-glass-border bg-surface text-text-secondary transition-colors hover:bg-surface-strong hover:text-text-primary"
+    >
+      <svg
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        className="h-[18px] w-[18px]"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {children}
+      </svg>
+    </Link>
+  );
+}
+
 export function SiteNav({ profile }: { profile: ProfileRow }) {
   return (
     <header className="sticky top-0 z-30 border-b border-glass-border bg-bg/85 backdrop-blur-xl">
       <nav className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
         <Wordmark href="/" />
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
+          <NavLink href="/watchlist" label="Watchlist">
+            <path d="M7 4h10a1 1 0 0 1 1 1v15l-6-4-6 4V5a1 1 0 0 1 1-1Z" />
+          </NavLink>
+
+          <NavLink href="/friends" label="Friends">
+            <circle cx="9" cy="9" r="3.2" />
+            <path d="M3.8 19a5.4 5.4 0 0 1 10.4 0M16 6.2a3 3 0 0 1 0 5.6M17.5 19a5 5 0 0 0-2-4" />
+          </NavLink>
+
           <Link
             href="/search"
             className="flex h-9 items-center gap-2 rounded-full border border-glass-border bg-surface px-3 text-label text-text-secondary transition-colors hover:bg-surface-strong hover:text-text-primary"
@@ -32,7 +74,7 @@ export function SiteNav({ profile }: { profile: ProfileRow }) {
               <circle cx="11" cy="11" r="6.5" />
               <path d="m16 16 4 4" />
             </svg>
-            <span className="hidden sm:inline">Add a film</span>
+            <span className="hidden sm:inline">Add</span>
           </Link>
 
           <ThemeToggle />

@@ -62,7 +62,17 @@ See phases.md for the phased breakdown. Summary:
 
 ## Explicit product decisions (already made, don't relitigate without reason)
 
-- IMDb rating shows "Coming soon" — not fetched from any API
+> **Status, 2026-08-31.** Phases 2–4 were built ahead of the usage evidence the
+> phase gate called for, at the owner's direction (see phases.md). That changes
+> *when* features ship, not *what* was decided below — every entry in this list
+> still stands, and the IMDb item in particular is still unbuilt.
+
+- IMDb rating shows "Coming soon" — not fetched from any API. Phase 4 lists
+  revisiting this; it has not been revisited. Two things block it: IMDb has no
+  free public API (OMDb, the usual substitute, meters its free tier and charges
+  past it, which the $0 constraint below rules out), and this list requires the
+  decision be reversed here, in writing, before code is written. Neither has
+  happened, so the UI still renders the static label.
 - No redirect from cast members to their IMDb pages
 - No user-uploaded movie logos — TMDB logo or empty placeholder, nothing else
 - Movies-only in the data model until TV support is deliberately scoped

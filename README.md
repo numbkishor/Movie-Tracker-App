@@ -3,9 +3,22 @@
 A social movie watched-list tracker. Sign in once and your list is the same on
 your phone and your PC — because both are reading the same rows.
 
-This repository implements **Phase 0 and Phase 1** of `docs/phases.md`. Friends,
-sharing, watchlist, TV tracking and recommendations are Phases 2–4 and are
-deliberately not built yet.
+This repository implements **Phases 0–3** of `docs/phases.md` in full, plus the
+Capacitor scaffold from Phase 4.
+
+Phase 4's IMDb rating item is deliberately still unbuilt — see the explicit
+decisions list in `docs/prd.md` for why. The phase gate in `docs/phases.md` was
+lifted by the project owner rather than met, so the exit conditions in each
+phase remain open questions about real usage, not boxes that were ticked.
+
+| Phase | What it added | State |
+|---|---|---|
+| 0 | Scaffold, design tokens, schema, TMDB proxy | Done |
+| 1 | Auth, search, watched list, bento feed, PWA | Done |
+| 2 | Friends, per-entry sharing, friend activity | Done |
+| 3 | Watchlist, series + seasons, similar titles | Done |
+| 4 | Capacitor wrapper | Scaffolded, see `docs/native.md` |
+| 4 | Real IMDb rating | Not built — see `docs/prd.md` |
 
 ## The docs are the spec
 
@@ -37,15 +50,21 @@ cp .env.example .env.local
 
 ### 2. Supabase
 
-Create a free project, then apply the schema:
+Create a free project, then apply the migrations **in order**:
 
 ```bash
 supabase db push
 ```
 
-Or paste `supabase/migrations/0001_init.sql` into the SQL editor. It creates
-`profiles`, `movies`, `watched_entries` and `watchlist_entries`, enables RLS on
-all four, and installs the trigger that gives every new account a profile row.
+Or paste them into the SQL editor one at a time:
+
+| Migration | What it does |
+|---|---|
+| `0001_init.sql` | `profiles`, `movies`, `watched_entries`, `watchlist_entries`, RLS on all four, and the trigger that gives every new account a profile row |
+| `0002_social.sql` | `friendships`, the friend-check helpers, and the rewritten entry-visibility policies |
+| `0003_depth.sql` | Re-keys titles to `(tmdb_id, media_type)` for series support, adds `watched_seasons` and `title_seasons` |
+
+`0003` alters tables `0001` created, so running them out of order will fail.
 
 Under **Authentication → Providers**, enable email sign-in. If you leave email
 confirmation on, set the confirmation redirect to `<your-url>/auth/confirm`.
@@ -78,12 +97,22 @@ script for it:
 \i supabase/tests/rls.sql
 ```
 
-It creates two throwaway users, asserts that neither can read, update or delete
-the other's rows (and that a signed-out visitor can read nothing at all), then
-rolls back. A raised exception means a policy is wrong.
+It creates three throwaway users and asserts, in one transaction that rolls
+back:
 
-Still do the two-real-sessions check by hand before calling a policy done — the
-script is the fast repeat, not a replacement for it.
+- an owner sees their own rows and nobody else's;
+- a **stranger** sees nothing — including entries marked shared;
+- a **pending** request grants no visibility, and a requester cannot accept
+  their own request;
+- an **accepted friend** sees exactly the shared rows, cannot see private ones,
+  and cannot update or delete what they can see;
+- season progress inherits its parent entry's visibility;
+- a **blocked** user loses visibility and cannot delete or undo the block;
+- a signed-out reader sees nothing on any table.
+
+A raised exception means a policy is wrong. Still do the two-real-sessions check
+by hand before calling a policy done — the script is the fast repeat, not a
+replacement for it.
 
 ## Deploying to Vercel
 
@@ -93,16 +122,32 @@ settings, and deploy. No build configuration is needed.
 ## Layout
 
 ```
-docs/                     the spec files above
-supabase/migrations/      schema + RLS
+docs/                     the spec files above, plus native.md
+supabase/migrations/      schema + RLS, applied in order
 supabase/tests/           RLS assertions
 src/app/(auth)/           sign-in, sign-up
-src/app/(app)/            signed-in shell: feed, search, film detail, profile
+src/app/(app)/            signed-in shell:
+                            /                 bento feed, friend activity
+                            /search           films and series
+                            /title/[media]/   detail, entry form, seasons
+                            /watchlist        queued titles
+                            /friends          requests, friends, blocks
+                            /u/[username]     someone else's profile
+                            /profile          your own
 src/app/api/tmdb/         TMDB proxy — the key lives here, never in the browser
+src/app/api/people/       username lookup for adding friends
 src/components/           UI, split by area
 src/lib/tmdb.ts           the one place TMDB responses are shaped
+src/lib/routes.ts         URL builders, safe to import from client components
+src/lib/titles.ts         entry queries (server-only)
+src/lib/friends.ts        friendship queries (server-only)
 src/lib/supabase/         server + middleware clients, generated-shape DB types
 ```
+
+## Native app
+
+See `docs/native.md`. The Capacitor config is committed; the native build itself
+has not been run.
 
 ## Attribution
 

@@ -82,6 +82,7 @@ export type Database = {
           id: string;
           user_id: string;
           movie_id: number;
+          media_type: string;
           rating: number | null;
           review: string | null;
           watched_on: string;
@@ -92,6 +93,7 @@ export type Database = {
           id?: string;
           user_id: string;
           movie_id: number;
+          media_type?: string;
           rating?: number | null;
           review?: string | null;
           watched_on?: string;
@@ -102,6 +104,7 @@ export type Database = {
           id?: string;
           user_id?: string;
           movie_id?: number;
+          media_type?: string;
           rating?: number | null;
           review?: string | null;
           watched_on?: string;
@@ -118,10 +121,10 @@ export type Database = {
           },
           {
             foreignKeyName: "watched_entries_movie_id_fkey";
-            columns: ["movie_id"];
+            columns: ["movie_id", "media_type"];
             isOneToOne: false;
             referencedRelation: "movies";
-            referencedColumns: ["tmdb_id"];
+            referencedColumns: ["tmdb_id", "media_type"];
           },
         ];
       };
@@ -130,6 +133,7 @@ export type Database = {
           id: string;
           user_id: string;
           movie_id: number;
+          media_type: string;
           is_public: boolean;
           created_at: string;
         };
@@ -137,6 +141,7 @@ export type Database = {
           id?: string;
           user_id: string;
           movie_id: number;
+          media_type?: string;
           is_public?: boolean;
           created_at?: string;
         };
@@ -144,6 +149,7 @@ export type Database = {
           id?: string;
           user_id?: string;
           movie_id?: number;
+          media_type?: string;
           is_public?: boolean;
           created_at?: string;
         };
@@ -157,12 +163,122 @@ export type Database = {
           },
           {
             foreignKeyName: "watchlist_entries_movie_id_fkey";
-            columns: ["movie_id"];
+            columns: ["movie_id", "media_type"];
             isOneToOne: false;
             referencedRelation: "movies";
-            referencedColumns: ["tmdb_id"];
+            referencedColumns: ["tmdb_id", "media_type"];
           },
         ];
+      };
+      friendships: {
+        Row: {
+          id: string;
+          requester_id: string;
+          addressee_id: string;
+          status: string;
+          blocked_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          requester_id: string;
+          addressee_id: string;
+          status?: string;
+          blocked_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          requester_id?: string;
+          addressee_id?: string;
+          status?: string;
+          blocked_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "friendships_requester_id_fkey";
+            columns: ["requester_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "friendships_addressee_id_fkey";
+            columns: ["addressee_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      watched_seasons: {
+        Row: {
+          id: string;
+          entry_id: string;
+          season_number: number;
+          watched_on: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          entry_id: string;
+          season_number: number;
+          watched_on?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          entry_id?: string;
+          season_number?: number;
+          watched_on?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "watched_seasons_entry_id_fkey";
+            columns: ["entry_id"];
+            isOneToOne: false;
+            referencedRelation: "watched_entries";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      title_seasons: {
+        Row: {
+          show_id: number;
+          season_number: number;
+          name: string;
+          episode_count: number | null;
+          air_date: string | null;
+          poster_path: string | null;
+          media_type: string;
+          cached_at: string;
+        };
+        Insert: {
+          show_id: number;
+          season_number: number;
+          name: string;
+          episode_count?: number | null;
+          air_date?: string | null;
+          poster_path?: string | null;
+          media_type?: string;
+          cached_at?: string;
+        };
+        Update: {
+          show_id?: number;
+          season_number?: number;
+          name?: string;
+          episode_count?: number | null;
+          air_date?: string | null;
+          poster_path?: string | null;
+          media_type?: string;
+          cached_at?: string;
+        };
+        Relationships: [];
       };
     };
     Views: Record<never, never>;
@@ -173,5 +289,9 @@ export type Database = {
 };
 
 export type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+export type FriendshipRow = Database["public"]["Tables"]["friendships"]["Row"];
+export type WatchlistEntryRow = Database["public"]["Tables"]["watchlist_entries"]["Row"];
+export type WatchedSeasonRow = Database["public"]["Tables"]["watched_seasons"]["Row"];
+export type TitleSeasonRow = Database["public"]["Tables"]["title_seasons"]["Row"];
 export type MovieRow = Database["public"]["Tables"]["movies"]["Row"];
 export type WatchedEntryRow = Database["public"]["Tables"]["watched_entries"]["Row"];

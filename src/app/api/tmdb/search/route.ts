@@ -1,12 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import { searchMovies, TmdbError } from "@/lib/tmdb";
+import { searchTitles, TmdbError } from "@/lib/tmdb";
 import { createClient } from "@/lib/supabase/server";
 import { rateLimit } from "@/lib/rate-limit";
 
 /**
- * Search proxy for the client-side search box. The TMDB key stays in this
- * process; the browser only ever sees the mapped results.
+ * Search proxy for the client-side search box. Films and series together since
+ * Phase 3. The TMDB key stays in this process; the browser only ever sees the
+ * mapped results.
  */
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const results = await searchMovies(query);
+    const results = await searchTitles(query);
     return NextResponse.json({ results });
   } catch (error) {
     return NextResponse.json({ error: describeTmdbFailure(error) }, { status: 502 });

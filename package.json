@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "cap:sync": "npx @capacitor/cli@latest sync",
+    "cap:add:android": "npx @capacitor/cli@latest add android",
+    "cap:add:ios": "npx @capacitor/cli@latest add ios"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.5",

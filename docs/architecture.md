@@ -54,7 +54,15 @@ the first time any user adds that title, and everything else foreign-keys
 to it. This also means a title's poster/backdrop path doesn't vanish if
 TMDB briefly errors.
 
-## Schema (MVP scope)
+## Schema
+
+> **Amended in Phase 3.** `movies.tmdb_id` was the primary key on its own while
+> the app was films-only. TMDB numbers films and series in separate sequences,
+> so once series were added, film 1399 and series 1399 collided on that key. The
+> identity of a cached title is now **(tmdb_id, media_type)**, and every table
+> referencing it carries both columns. The MVP shape is kept below for history;
+> `supabase/migrations/0003_depth.sql` is the change, and the current shape is
+> summarised after it.
 
 ```
 profiles
@@ -92,14 +100,52 @@ watchlist_entries
   created_at    timestamptz, default now()
 ```
 
-Deferred to a later phase (not in MVP): `friendships` table, season/episode
-tracking, any table backing recommendations.
+### Current shape (after Phases 2–3)
+
+```
+movies
+  primary key            (tmdb_id, media_type)   -- was tmdb_id alone
+
+watched_entries
+  media_type    text ('movie' | 'tv')
+  foreign key   (movie_id, media_type) -> movies (tmdb_id, media_type)
+  unique        (user_id, movie_id, media_type)
+
+watchlist_entries
+  same two changes as watched_entries
+
+friendships
+  id            uuid, primary key
+  requester_id  uuid, references profiles.id
+  addressee_id  uuid, references profiles.id
+  status        text ('pending' | 'accepted' | 'blocked')
+  blocked_by    uuid, nullable, references profiles.id
+  created_at    timestamptz
+  updated_at    timestamptz
+  unique index on (least(requester,addressee), greatest(requester,addressee))
+                -- one row per pair, whichever direction it was requested in
+
+watched_seasons
+  id            uuid, primary key
+  entry_id      uuid, references watched_entries.id on delete cascade
+  season_number integer
+  watched_on    date
+                -- hangs off the series entry rather than carrying its own
+                -- user_id, so ownership and visibility have exactly one source
+
+title_seasons
+  (show_id, season_number) primary key   -- cached TMDB season metadata
+```
+
+Still not modelled, deliberately: episode-level progress. A season is the unit
+people talk about finishing.
 
 ## Row-Level Security — the part most likely to bite you
 
-Assumption to confirm before building: "public" means visible to your
-accepted friends, not the open internet. If that's wrong, the policies
-below need to change — this is a product decision, not just a technical one.
+The assumption is confirmed and implemented as stated: **"public" means visible
+to your accepted friends, never the open internet.** There is no policy anywhere
+that exposes a row to an anonymous visitor, and `supabase/tests/rls.sql` asserts
+that a signed-out reader sees nothing on any table.
 
 - `watched_entries` / `watchlist_entries`: a row is readable if
   `user_id = auth.uid()` (it's yours) OR (`is_public = true` AND the viewer
@@ -111,8 +157,17 @@ below need to change — this is a product decision, not just a technical one.
 - `movies`: readable by anyone (it's just cached metadata, not user data);
   writable only via the server-side TMDB route, not directly by clients.
 
+Two helper functions do the friend check (`is_accepted_friend`,
+`has_block_with`). They are SECURITY DEFINER with a pinned `search_path`,
+because a policy that queried `friendships` directly would evaluate that
+subquery under the *viewer's* own RLS — fragile and recursive. Each takes only
+"the other person" and reads `auth.uid()` itself, so neither can be used to
+probe whether two strangers are friends.
+
 Test every policy by trying to read/write as a *different* logged-in user in
-a second session before considering a table "done."
+a second session before considering a table "done." `supabase/tests/rls.sql` is
+the fast repeat of that check and covers stranger, pending-request, accepted
+friend, and blocked cases.
 
 ## TMDB integration points
 

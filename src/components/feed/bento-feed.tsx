@@ -5,7 +5,9 @@ import { Poster } from "@/components/ui/poster";
 import { RatingStars } from "@/components/ui/rating-stars";
 import { classNames, formatDate, formatRating, formatYear } from "@/lib/format";
 import { tmdbImageUrl } from "@/lib/tmdb-image";
-import type { WatchedEntryWithMovie } from "@/lib/watched";
+import { titleHref } from "@/lib/routes";
+import type { WatchedEntryWithTitle } from "@/lib/titles";
+import { MediaBadge } from "@/components/ui/media-badge";
 
 /**
  * The bento grid from design.md: a 2×2 hero for the most recent watch, one tall
@@ -13,7 +15,7 @@ import type { WatchedEntryWithMovie } from "@/lib/watched";
  * count steps down on narrow viewports rather than the layout being redesigned
  * per breakpoint.
  */
-export function BentoFeed({ entries }: { entries: WatchedEntryWithMovie[] }) {
+export function BentoFeed({ entries }: { entries: WatchedEntryWithTitle[] }) {
   const [hero, tall, ...rest] = entries;
 
   if (!hero) return null;
@@ -29,8 +31,8 @@ export function BentoFeed({ entries }: { entries: WatchedEntryWithMovie[] }) {
   );
 }
 
-function cardHref(entry: WatchedEntryWithMovie): string {
-  return `/movie/${entry.movie.tmdb_id}`;
+function cardHref(entry: WatchedEntryWithTitle): string {
+  return titleHref(entry.title.media_type, entry.title.tmdb_id);
 }
 
 const cardShell =
@@ -54,10 +56,10 @@ function RatingPill({ rating, large = false }: { rating: number; large?: boolean
   );
 }
 
-function HeroCard({ entry }: { entry: WatchedEntryWithMovie }) {
-  const backdrop = tmdbImageUrl(entry.movie.backdrop_path, "w780");
+function HeroCard({ entry }: { entry: WatchedEntryWithTitle }) {
+  const backdrop = tmdbImageUrl(entry.title.backdrop_path, "w780");
   const watched = formatDate(entry.watched_on);
-  const year = formatYear(entry.movie.release_date);
+  const year = formatYear(entry.title.release_date);
 
   return (
     <Link href={cardHref(entry)} className={classNames(cardShell, "col-span-2 row-span-2")}>
@@ -72,8 +74,8 @@ function HeroCard({ entry }: { entry: WatchedEntryWithMovie }) {
         />
       ) : (
         <Poster
-          title={entry.movie.title}
-          posterPath={entry.movie.poster_path}
+          title={entry.title.title}
+          posterPath={entry.title.poster_path}
           size="w780"
           sizes="(max-width: 640px) 100vw, 50vw"
           className="transition-transform duration-500 group-hover:scale-[1.03]"
@@ -89,20 +91,23 @@ function HeroCard({ entry }: { entry: WatchedEntryWithMovie }) {
           {watched ? `Watched ${watched}` : "Most recent"}
         </p>
         <h3 className="font-display text-hero font-bold leading-tight text-text-primary">
-          {entry.movie.title}
+          {entry.title.title}
         </h3>
-        {year ? <p className="text-label text-text-secondary">{year}</p> : null}
+        <p className="flex items-center gap-2 text-label text-text-secondary">
+          <MediaBadge mediaType={entry.title.media_type} />
+          {year ? <span>{year}</span> : null}
+        </p>
       </div>
     </Link>
   );
 }
 
-function TallCard({ entry }: { entry: WatchedEntryWithMovie }) {
+function TallCard({ entry }: { entry: WatchedEntryWithTitle }) {
   return (
     <Link href={cardHref(entry)} className={classNames(cardShell, "row-span-2")}>
       <Poster
-        title={entry.movie.title}
-        posterPath={entry.movie.poster_path}
+        title={entry.title.title}
+        posterPath={entry.title.poster_path}
         size="w500"
         sizes="(max-width: 640px) 45vw, 240px"
         className="transition-transform duration-500 group-hover:scale-[1.03]"
@@ -113,7 +118,7 @@ function TallCard({ entry }: { entry: WatchedEntryWithMovie }) {
 
       <div className="absolute inset-x-0 bottom-0 flex flex-col gap-0.5 p-3">
         <h3 className="font-display text-card font-medium leading-tight text-text-primary">
-          {entry.movie.title}
+          {entry.title.title}
         </h3>
         <p className="text-meta text-text-secondary">{formatDate(entry.watched_on)}</p>
       </div>
@@ -121,12 +126,12 @@ function TallCard({ entry }: { entry: WatchedEntryWithMovie }) {
   );
 }
 
-function SquareCard({ entry }: { entry: WatchedEntryWithMovie }) {
+function SquareCard({ entry }: { entry: WatchedEntryWithTitle }) {
   return (
     <Link href={cardHref(entry)} className={cardShell}>
       <Poster
-        title={entry.movie.title}
-        posterPath={entry.movie.poster_path}
+        title={entry.title.title}
+        posterPath={entry.title.poster_path}
         size="w342"
         sizes="(max-width: 640px) 45vw, 200px"
         className="transition-transform duration-500 group-hover:scale-[1.03]"
@@ -135,7 +140,7 @@ function SquareCard({ entry }: { entry: WatchedEntryWithMovie }) {
 
       <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 p-3">
         <h3 className="font-display text-card-sm font-medium leading-tight text-text-primary">
-          {entry.movie.title}
+          {entry.title.title}
         </h3>
         {entry.rating !== null ? <RatingStars rating={entry.rating} size={12} /> : null}
       </div>

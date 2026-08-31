@@ -8,6 +8,9 @@ import "server-only";
  * `server-only` above is the guard that makes the key leak a build error rather
  * than a runtime surprise: importing this file from a client component fails the
  * build instead of quietly shipping TMDB_API_KEY to the browser.
+ *
+ * Films and shows are normalised into one shape here, so nothing downstream has
+ * to remember that TMDB calls a show's name `name` and its date `first_air_date`.
  */
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
@@ -17,20 +20,25 @@ const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 // already have this module imported don't need a second import.
 export { tmdbImageUrl, type TmdbImageSize } from "@/lib/tmdb-image";
 
-import type {
-  CastMember,
-  MovieCacheRow,
-  MovieDetail,
-  MovieSummary,
+import {
+  isMediaType,
+  type CastMember,
+  type MediaType,
+  type SeasonSummary,
+  type TitleCacheRow,
+  type TitleDetail,
+  type TitleSummary,
 } from "@/lib/tmdb-types";
 
 // Mapped response shapes live in lib/tmdb-types.ts so client components can
 // import them without pulling in this server-only module.
 export type {
-  MovieSummary,
+  MediaType,
+  TitleSummary,
   CastMember,
-  MovieDetail,
-  MovieCacheRow,
+  SeasonSummary,
+  TitleDetail,
+  TitleCacheRow,
 } from "@/lib/tmdb-types";
 
 export class TmdbError extends Error {
@@ -95,8 +103,11 @@ function normalizeDate(value: string | null | undefined): string | null {
 
 type RawSearchResult = {
   id: number;
+  media_type?: string;
   title?: string;
+  name?: string;
   release_date?: string;
+  first_air_date?: string;
   poster_path?: string | null;
   overview?: string;
 };
@@ -111,30 +122,54 @@ type RawCredit = {
   id: number;
   name?: string;
   character?: string;
+  roles?: { character?: string }[];
   profile_path?: string | null;
   order?: number;
 };
 
-type RawMovieDetail = {
+type RawSeason = {
+  season_number: number;
+  name?: string;
+  episode_count?: number;
+  air_date?: string;
+  poster_path?: string | null;
+};
+
+type RawTitleDetail = {
   id: number;
   title?: string;
+  name?: string;
   tagline?: string;
   overview?: string;
   release_date?: string;
+  first_air_date?: string;
   runtime?: number | null;
+  episode_run_time?: number[];
   genres?: { id: number; name: string }[];
   poster_path?: string | null;
   backdrop_path?: string | null;
+  seasons?: RawSeason[];
   images?: { logos?: RawImage[] };
   credits?: { cast?: RawCredit[] };
+  aggregate_credits?: { cast?: RawCredit[] };
 };
 
-function mapSearchResult(raw: RawSearchResult): MovieSummary {
-  const release_date = normalizeDate(raw.release_date);
+/** Films carry `title`/`release_date`; shows carry `name`/`first_air_date`. */
+function displayTitle(raw: { title?: string; name?: string }): string {
+  return raw.title ?? raw.name ?? "Untitled";
+}
+
+function displayDate(raw: { release_date?: string; first_air_date?: string }): string | null {
+  return normalizeDate(raw.release_date ?? raw.first_air_date);
+}
+
+function mapSearchResult(raw: RawSearchResult, mediaType: MediaType): TitleSummary {
+  const release_date = displayDate(raw);
 
   return {
     tmdb_id: raw.id,
-    title: raw.title ?? "Untitled",
+    media_type: mediaType,
+    title: displayTitle(raw),
     release_date,
     release_year: releaseYear(release_date),
     poster_path: raw.poster_path ?? null,
@@ -173,62 +208,117 @@ function mapCast(credits: RawCredit[] | undefined): CastMember[] {
     .map((member) => ({
       id: member.id,
       name: member.name ?? "Unknown",
-      character: member.character ?? "",
+      // Series credits nest the character under `roles` rather than exposing it
+      // directly, since a regular can play different parts across seasons.
+      character: member.character ?? member.roles?.[0]?.character ?? "",
       profile_path: member.profile_path ?? null,
     }));
 }
 
-function mapMovieDetail(raw: RawMovieDetail): MovieDetail {
-  const release_date = normalizeDate(raw.release_date);
+function mapSeasons(seasons: RawSeason[] | undefined): SeasonSummary[] {
+  if (!seasons) return [];
+
+  return seasons
+    .slice()
+    .sort((a, b) => a.season_number - b.season_number)
+    .map((season) => ({
+      season_number: season.season_number,
+      name: season.name ?? `Season ${season.season_number}`,
+      episode_count: season.episode_count ?? null,
+      air_date: normalizeDate(season.air_date),
+      poster_path: season.poster_path ?? null,
+    }));
+}
+
+function runtimeOf(raw: RawTitleDetail): number | null {
+  if (raw.runtime && raw.runtime > 0) return raw.runtime;
+
+  const episodeRuntime = raw.episode_run_time?.find((value) => value > 0);
+  return episodeRuntime ?? null;
+}
+
+function mapTitleDetail(raw: RawTitleDetail, mediaType: MediaType): TitleDetail {
+  const release_date = displayDate(raw);
 
   return {
     tmdb_id: raw.id,
-    media_type: "movie",
-    title: raw.title ?? "Untitled",
+    media_type: mediaType,
+    title: displayTitle(raw),
     tagline: raw.tagline && raw.tagline.length > 0 ? raw.tagline : null,
     overview: raw.overview ?? "",
     release_date,
     release_year: releaseYear(release_date),
-    runtime_minutes: raw.runtime && raw.runtime > 0 ? raw.runtime : null,
+    runtime_minutes: runtimeOf(raw),
     genres: (raw.genres ?? []).map((genre) => genre.name),
     poster_path: raw.poster_path ?? null,
     backdrop_path: raw.backdrop_path ?? null,
     logo_path: pickLogoPath(raw.images?.logos),
-    cast: mapCast(raw.credits?.cast),
+    cast: mapCast(raw.credits?.cast ?? raw.aggregate_credits?.cast),
+    seasons: mediaType === "tv" ? mapSeasons(raw.seasons) : [],
   };
 }
 
-/** Movies only. TV search is deliberately out of scope until Phase 3. */
-export async function searchMovies(query: string): Promise<MovieSummary[]> {
+/**
+ * Searches films and shows together. TMDB's multi endpoint also returns people;
+ * those are dropped rather than shown, since nothing in the app can be done with
+ * a person.
+ */
+export async function searchTitles(query: string): Promise<TitleSummary[]> {
   const trimmed = query.trim();
   if (trimmed.length === 0) return [];
 
-  const data = await tmdbFetch<{ results?: RawSearchResult[] }>("/search/movie", {
+  const data = await tmdbFetch<{ results?: RawSearchResult[] }>("/search/multi", {
     query: trimmed,
     include_adult: "false",
     page: "1",
   });
 
-  return (data.results ?? []).map(mapSearchResult);
+  return (data.results ?? [])
+    .filter((result) => isMediaType(result.media_type))
+    .map((result) => mapSearchResult(result, result.media_type as MediaType));
 }
 
 /**
  * Details, images and credits in one request via append_to_response, so adding a
- * movie is a single round trip rather than three.
+ * title is a single round trip rather than three.
  */
-export async function getMovieDetail(tmdbId: number): Promise<MovieDetail> {
-  const data = await tmdbFetch<RawMovieDetail>(`/movie/${tmdbId}`, {
-    append_to_response: "images,credits",
+export async function getTitleDetail(
+  mediaType: MediaType,
+  tmdbId: number,
+): Promise<TitleDetail> {
+  // Series use aggregate_credits: `credits` on a show returns only the current
+  // season's cast, which reads as wrong for anything long-running.
+  const credits = mediaType === "tv" ? "aggregate_credits" : "credits";
+
+  const data = await tmdbFetch<RawTitleDetail>(`/${mediaType}/${tmdbId}`, {
+    append_to_response: `images,${credits}`,
     // Logos are often language-tagged; without this TMDB filters them out
     // entirely when `language` is set.
     include_image_language: "en,null",
   });
 
-  return mapMovieDetail(data);
+  return mapTitleDetail(data, mediaType);
+}
+
+/**
+ * TMDB's "similar" lookup. This is a lookup, not a recommendation engine, and
+ * docs/prd.md is explicit that it must be presented to users as exactly that.
+ */
+export async function getSimilarTitles(
+  mediaType: MediaType,
+  tmdbId: number,
+  limit = 8,
+): Promise<TitleSummary[]> {
+  const data = await tmdbFetch<{ results?: RawSearchResult[] }>(
+    `/${mediaType}/${tmdbId}/similar`,
+    { page: "1" },
+  );
+
+  return (data.results ?? []).slice(0, limit).map((result) => mapSearchResult(result, mediaType));
 }
 
 /** Narrows a full detail record to the columns the `movies` cache table holds. */
-export function toMovieCacheRow(detail: MovieDetail): MovieCacheRow {
+export function toTitleCacheRow(detail: TitleDetail): TitleCacheRow {
   return {
     tmdb_id: detail.tmdb_id,
     media_type: detail.media_type,

@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 
 import { SearchPanel } from "@/components/movie/search-panel";
 import { getSignedInUser } from "@/lib/auth";
-import { listWatchedEntries } from "@/lib/watched";
+import { listWatchedEntries } from "@/lib/titles";
 
-export const metadata: Metadata = { title: "Add a film" };
+export const metadata: Metadata = { title: "Add a title" };
 export const dynamic = "force-dynamic";
 
 export default async function SearchPage() {
@@ -19,13 +19,15 @@ export default async function SearchPage() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
       <header className="flex flex-col gap-1">
-        <h1 className="text-hero font-bold">Add a film</h1>
+        <h1 className="text-hero font-bold">Add a title</h1>
         <p className="text-body text-text-secondary">
-          Films only for now — series tracking is deliberately a later phase.
+          Films and series, straight from TMDB.
         </p>
       </header>
 
-      <SearchPanel watchedMovieIds={entries.map((entry) => entry.movie.tmdb_id)} />
+      <SearchPanel
+        watchedKeys={entries.map((entry) => `${entry.media_type}-${entry.movie_id}`)}
+      />
     </div>
   );
 }
